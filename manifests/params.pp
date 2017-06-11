@@ -360,6 +360,4 @@ class kafka::params {
     'topic'                      => '',
     'value-serializer'           => 'kafka.serializer.DefaultEncoder',
   }
-
-  $mirror_url_regex = '^(https?:\/\/)([\da-z\.-]+)\.([a-z\.]{2,6})(:[\d]{2,5})?(\/[\w \.-]*)*\/?$'
 }
