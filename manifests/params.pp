@@ -22,6 +22,7 @@ class kafka::params {
   $user_id        = undef
   $user           = 'kafka'
   $group          = 'kafka'
+  $manage_install = false
 
   $service_requires_zookeeper = true
 

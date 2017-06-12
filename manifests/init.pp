@@ -73,113 +73,117 @@ class kafka (
   $group          = $kafka::params::group,
   $config_dir     = $kafka::params::config_dir,
   $log_dir        = $kafka::params::log_dir,
+  $manage_install = $kafka::params::manage_install,
 ) inherits kafka::params {
 
   validate_re($::osfamily, 'RedHat|Debian\b', "${::operatingsystem} not supported")
   validate_bool($install_java)
   validate_absolute_path($package_dir)
 
-  $basefilename = "kafka_${scala_version}-${version}.tgz"
-  $package_url = "${mirror_url}/kafka/${version}/${basefilename}"
+  if $manage_install {
 
-  $source = $mirror_url ?{
-    /tgz$/ => $mirror_url,
-    default  => $package_url,
-  }
+    $basefilename = "kafka_${scala_version}-${version}.tgz"
+    $package_url = "${mirror_url}/kafka/${version}/${basefilename}"
 
-  $install_directory = $install_dir ? {
-    # if install_dir was not changed,
-    # we adapt it for the scala_version and the version
-    $kafka::params::install_dir => "/opt/kafka-${scala_version}-${version}",
-    # else, we just take whatever was supplied:
-    default                     => $install_dir,
-  }
-
-  if $install_java {
-    class { '::java':
-      distribution => 'jdk',
+    $source = $mirror_url ? {
+      /tgz$/  => $mirror_url,
+      default => $package_url,
     }
-  }
 
-  group { $group:
-    ensure => present,
-    gid    => $group_id,
-  }
+    $install_directory = $install_dir ? {
+      # if install_dir was not changed,
+      # we adapt it for the scala_version and the version
+      $kafka::params::install_dir => "/opt/kafka-${scala_version}-${version}",
+      # else, we just take whatever was supplied:
+      default                     => $install_dir,
+    }
 
-  user { $user:
-    ensure  => present,
-    shell   => '/bin/bash',
-    require => Group[$group],
-    uid     => $user_id,
-  }
+    if $install_java {
+      class { '::java':
+        distribution => 'jdk',
+      }
+    }
 
-  file { $package_dir:
-    ensure  => directory,
-    owner   => $user,
-    group   => $group,
-    require => [
-      Group[$group],
-      User[$user],
-    ],
-  }
+    group { $group:
+      ensure => present,
+      gid    => $group_id,
+    }
 
-  file { $install_directory:
-    ensure  => directory,
-    owner   => $user,
-    group   => $group,
-    require => [
-      Group[$group],
-      User[$user],
-    ],
-  }
+    user { $user:
+      ensure  => present,
+      shell   => '/bin/bash',
+      require => Group[$group],
+      uid     => $user_id,
+    }
 
-  file { '/opt/kafka':
-    ensure  => link,
-    target  => $install_directory,
-    require => File[$install_directory],
-  }
-
-  file { $config_dir:
-    ensure => directory,
-    owner  => $user,
-    group  => $group,
-  }
-
-  file { $log_dir:
-    ensure  => directory,
-    owner   => $user,
-    group   => $group,
-    require => [
-      Group[$group],
-      User[$user],
-    ],
-  }
-
-  if $package_name == undef {
-    include '::archive'
-
-    archive { "${package_dir}/${basefilename}":
-      ensure          => present,
-      extract         => true,
-      extract_command => 'tar xfz %s --strip-components=1',
-      extract_path    => $install_directory,
-      source          => $source,
-      creates         => "${install_directory}/config",
-      cleanup         => true,
-      user            => $user,
-      group           => $group,
-      require         => [
-        File[$package_dir],
-        File[$install_directory],
+    file { $package_dir:
+      ensure  => directory,
+      owner   => $user,
+      group   => $group,
+      require => [
         Group[$group],
         User[$user],
       ],
-      before          => File[$config_dir],
     }
-  } else {
-    package { $package_name:
-      ensure => $package_ensure,
-      before => File[$config_dir],
+
+    file { $install_directory:
+      ensure  => directory,
+      owner   => $user,
+      group   => $group,
+      require => [
+        Group[$group],
+        User[$user],
+      ],
+    }
+
+    file { '/opt/kafka':
+      ensure  => link,
+      target  => $install_directory,
+      require => File[$install_directory],
+    }
+
+    file { $config_dir:
+      ensure => directory,
+      owner  => $user,
+      group  => $group,
+    }
+
+    file { $log_dir:
+      ensure  => directory,
+      owner   => $user,
+      group   => $group,
+      require => [
+        Group[$group],
+        User[$user],
+      ],
+    }
+
+    if $package_name == undef {
+      include '::archive'
+
+      archive { "${package_dir}/${basefilename}":
+        ensure          => present,
+        extract         => true,
+        extract_command => 'tar xfz %s --strip-components=1',
+        extract_path    => $install_directory,
+        source          => $source,
+        creates         => "${install_directory}/config",
+        cleanup         => true,
+        user            => $user,
+        group           => $group,
+        require         => [
+          File[$package_dir],
+          File[$install_directory],
+          Group[$group],
+          User[$user],
+        ],
+        before          => File[$config_dir],
+      }
+    } else {
+      package { $package_name:
+        ensure => $package_ensure,
+        before => File[$config_dir],
+      }
     }
   }
 }
